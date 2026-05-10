@@ -1,4 +1,5 @@
 LIBPNG_DIR = /home/softsec/libpng-1.2.56
+INSTALL_DIR = /home/softsec/install
 
 .PHONY: build-instrumented-libpng build-harness build fuzz
 
@@ -23,8 +24,12 @@ build-harness:
 
 build: build-instrumented-libpng build-harness
 
+clean:
+	rm -f png_fuzz
+	rm -rf $(INSTALL_DIR)
+	cd $(LIBPNG_DIR) && make distclean || true
+	rm -rf findings # remove findings from previous fuzzing runs
+
 
 fuzz: build 
-	afl-fuzz -i seeds -o findings -x /opt/AFLplusplus/dictionaries/png.dict -- ./png_fuzz @@
-
-
+	afl-fuzz -i minimized -o findings -x /AFLplusplus/dictionaries/png.dict -- ./png_fuzz @@
