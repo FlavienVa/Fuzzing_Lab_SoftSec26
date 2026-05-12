@@ -32,6 +32,7 @@ clean:
 	rm -rf findings findings-qemu
 
 fuzz: build 
+	afl-cmin -i ./seeds -o minimized -- ./png_fuzz @@
 	afl-fuzz -i minimized -o findings -x /AFLplusplus/dictionaries/png.dict -- ./png_fuzz @@
 
 # QEMU mode
@@ -53,6 +54,7 @@ build-harness-qemu:
 	-o png_fuzz_qemu
 
 fuzz-qemu: build-vanilla-libpng build-harness-qemu
+	afl-cmin -i ./seeds -o minimized -- ./png_fuzz_qemu @@
 	afl-fuzz -Q \
 	-i minimized \
 	-o findings-qemu \
