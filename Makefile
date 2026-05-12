@@ -54,7 +54,7 @@ build-harness-qemu:
 	-o png_fuzz_qemu
 
 fuzz-qemu: build-vanilla-libpng build-harness-qemu
-	afl-cmin -i ./seeds -o minimized -- ./png_fuzz_qemu @@
+	afl-cmin -Q -i ./seeds -o minimized -- ./png_fuzz_qemu @@
 	afl-fuzz -Q \
 	-i minimized \
 	-o findings-qemu \
