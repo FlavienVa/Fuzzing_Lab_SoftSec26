@@ -1,20 +1,35 @@
-CC      = afl-clang-fast
-CFLAGS  = -fsanitize=address -g -O1 -I/home/softsec/install/include
-LDFLAGS = -fsanitize=address -L/home/softsec/install/lib -lpng12 -lz
+LIBPNG_DIR = /home/softsec/libpng-1.2.56
+INSTALL_DIR = /home/softsec/install
 
-TARGET  = fuzzing_png_activate
-SRC     = src/harness.c
+.PHONY: build-instrumented-libpng build-harness build fuzz
 
-.PHONY: build fuzz clean
+build-instrumented-libpng:
+	cd $(LIBPNG_DIR) && \
+	CC=afl-clang-fast \
+	CXX=afl-clang-fast++ \
+	CFLAGS="-fsanitize=address -g -O1" \
+	LDFLAGS="-fsanitize=address" \
+	./configure --disable-shared --prefix=/home/softsec/install && \
+	make -j$$(nproc) && \
+	make install
 
-build: $(TARGET)
+build-harness:
+	afl-clang-fast ./src/harness.c \
+	-I/home/softsec/install/include \
+	-L/home/softsec/install/lib \
+	-lpng12 -lz -lm \
+	-fsanitize=address -g -O1 \
+	-o png_fuzz
 
-$(TARGET): $(SRC)
-	$(CC) $(CFLAGS) -o $(TARGET) $(SRC) $(LDFLAGS)
 
-fuzz: $(TARGET)
-	mkdir -p /home/softsec/host/findings
-	afl-fuzz -i /home/softsec/seeds -o /home/softsec/host/findings -- ./$(TARGET) @@
+build: build-instrumented-libpng build-harness
 
 clean:
-	rm -f $(TARGET)
+	rm -f png_fuzz
+	rm -rf $(INSTALL_DIR)
+	cd $(LIBPNG_DIR) && make distclean || true
+	rm -rf findings # remove findings from previous fuzzing runs
+
+
+fuzz: build 
+	afl-fuzz -i minimized -o findings -x /AFLplusplus/dictionaries/png.dict -- ./png_fuzz @@
