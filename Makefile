@@ -33,7 +33,7 @@ clean:
 	rm -rf $(INSTALL_DIR) $(INSTALL_DIR_NOSAN) $(INSTALL_DIR_VAN)
 	cd $(LIBPNG_DIR) && make distclean || true
 	rm -rf findings findings-nosan findings-qemu findings-persistent
-	rm -rf minimized minimized
+	rm -rf minimized
 
 fuzz: build 
 	afl-cmin -i ./seeds -o minimized -- ./png_fuzz @@

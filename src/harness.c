@@ -42,20 +42,21 @@ int main(int argc, char **argv)
 
     png_init_io(png, fp);
     png_read_info(png, info);
-
-    // Try to find issue with png_set_text
-    png_textp existing_text = NULL;
-    int num_text = 0;
-    png_get_text(png, info, &existing_text, &num_text);
-    if (num_text) 
-        {png_free_data(png, info, PNG_FREE_TEXT, -1);}
+   
+    //Try to find issue with png_set_text
+    png_textp existing_text;
     
-    png_text t;
-    memset(&t, 0, sizeof(t));
-    t.compression = PNG_TEXT_COMPRESSION_zTXt;
-    t.key = "test";
-    t.text = "abc";
-    png_set_text(png, info, &t, 1);
+    int num_comment = 0;
+    num_comment = png_get_text(png, info, &existing_text, NULL);
+    png_free_data(png, info, PNG_FREE_TEXT, -1);
+    
+    png_text t[1];
+    //memset(&t, 0, sizeof(t));
+    t[0].compression = PNG_TEXT_COMPRESSION_zTXt;
+    t[0].key = "test";
+    t[0].text = "abc";
+    t[0].text_length = 3;
+    png_set_text(png, info, t, 1);
 
 
     // Try more input transformations to reach more code paths
