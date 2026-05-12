@@ -1,7 +1,9 @@
-LIBPNG_DIR = /home/softsec/libpng-1.2.56
-INSTALL_DIR = /home/softsec/install
+LIBPNG_DIR        = /home/softsec/libpng-1.2.56
+INSTALL_DIR       = /home/softsec/install
+INSTALL_DIR_VAN   = /home/softsec/install_vanilla
 
-.PHONY: build-instrumented-libpng build-harness build fuzz
+.PHONY: build-instrumented-libpng build-harness build fuzz clean \
+        build-vanilla-libpng build-harness-qemu fuzz-qemu
 
 build-instrumented-libpng:
 	cd $(LIBPNG_DIR) && \
@@ -21,15 +23,38 @@ build-harness:
 	-fsanitize=address -g -O1 \
 	-o png_fuzz
 
-
 build: build-instrumented-libpng build-harness
 
 clean:
-	rm -f png_fuzz
-	rm -rf $(INSTALL_DIR)
+	rm -f png_fuzz png_fuzz_qemu
+	rm -rf $(INSTALL_DIR) $(INSTALL_DIR_VAN)
 	cd $(LIBPNG_DIR) && make distclean || true
-	rm -rf findings # remove findings from previous fuzzing runs
-
+	rm -rf findings findings-qemu
 
 fuzz: build 
 	afl-fuzz -i minimized -o findings -x /AFLplusplus/dictionaries/png.dict -- ./png_fuzz @@
+
+# QEMU mode
+build-vanilla-libpng:
+	cd $(LIBPNG_DIR) && \
+	make distclean || true && \
+	CC=gcc \
+	CFLAGS="-g -O1" \
+	./configure --disable-shared --prefix=$(INSTALL_DIR_VAN) && \
+	make -j$$(nproc) && \
+	make install
+
+build-harness-qemu:
+	gcc ./src/harness.c \
+	-I$(INSTALL_DIR_VAN)/include \
+	-L$(INSTALL_DIR_VAN)/lib \
+	-lpng12 -lz -lm \
+	-g -O1 \
+	-o png_fuzz_qemu
+
+fuzz-qemu: build-vanilla-libpng build-harness-qemu
+	afl-fuzz -Q \
+	-i minimized \
+	-o findings-qemu \
+	-x /AFLplusplus/dictionaries/png.dict \
+	-- ./png_fuzz_qemu @@
