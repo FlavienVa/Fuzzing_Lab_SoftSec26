@@ -57,19 +57,18 @@ int main(void)
         //Read header
         png_read_info(png, info);
 
-        //png_set_text path (same as harness.c)
-        png_textp existing_text = NULL;
-        int num_text = 0;
-        png_get_text(png, info, &existing_text, &num_text);
-        if (num_text)
-            png_free_data(png, info, PNG_FREE_TEXT, -1);
+        //png_set_text path
+        png_textp existing_text;
+        int num_comment = 0;
+        num_comment = png_get_text(png, info, &existing_text, NULL);
+        png_free_data(png, info, PNG_FREE_TEXT, -1);
 
-        png_text t;
-        memset(&t, 0, sizeof(t));
-        t.compression = PNG_TEXT_COMPRESSION_zTXt;
-        t.key  = (png_charp)"test";
-        t.text = (png_charp)"abc";
-        png_set_text(png, info, &t, 1);
+        png_text t[1];
+        t[0].compression = PNG_TEXT_COMPRESSION_zTXt;
+        t[0].key = (png_charp)"test";
+        t[0].text = (png_charp)"abc";
+        t[0].text_length = 3;
+        png_set_text(png, info, t, 1);
 
         //Transformations
         png_uint_32  color_type = png_get_color_type(png, info);
