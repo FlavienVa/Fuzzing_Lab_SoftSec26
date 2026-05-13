@@ -71,7 +71,7 @@ build-harness-persistent:
 	-fsanitize=address -g -O1 \
 	-o png_fuzz_persistent
 
-fuzz-persistent: build-harness-persistent
+fuzz-persistent: build-instrumented-libpng build-harness-persistent
 	afl-fuzz -i /home/softsec/seeds -o findings-persistent \
 	-x /AFLplusplus/dictionaries/png.dict \
 	-- ./png_fuzz_persistent @@
