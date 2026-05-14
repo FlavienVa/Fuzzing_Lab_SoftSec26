@@ -2,11 +2,14 @@ LIBPNG_DIR        = /home/softsec/libpng-1.2.56
 INSTALL_DIR       = /home/softsec/install
 INSTALL_DIR_NOSAN = /home/softsec/install_nosan
 INSTALL_DIR_VAN   = /home/softsec/install_vanilla
+IMAGE_NAME  := softsec-libpng-fuzz
+CONTAINER   := softsec-libpng
 
 .PHONY: build-instrumented-libpng build-harness build fuzz clean \
         build-libpng-nosan build-harness-nosan fuzz-nosan \
         build-harness-persistent fuzz-persistent \
-        build-vanilla-libpng build-harness-qemu fuzz-qemu
+        build-vanilla-libpng build-harness-qemu fuzz-qemu \
+		run
 
 build-instrumented-libpng:
 	cd $(LIBPNG_DIR) && \
@@ -26,18 +29,31 @@ build-harness:
 	-fsanitize=address -g -O1 \
 	-o png_fuzz
 
-build: build-instrumented-libpng build-harness
+build: 
+	docker build -t $(IMAGE_NAME) .
+
+run:
+	docker run -ti --rm --name $(CONTAINER) -v $$(pwd):/work -w /work $(IMAGE_NAME)
+
 
 clean:
+	docker rmi -f $(IMAGE_NAME)
 	rm -f png_fuzz png_fuzz_nosan png_fuzz_qemu png_fuzz_persistent
 	rm -rf $(INSTALL_DIR) $(INSTALL_DIR_NOSAN) $(INSTALL_DIR_VAN)
-	cd $(LIBPNG_DIR) && make distclean || true
 	rm -rf findings findings-nosan findings-qemu findings-persistent
 	rm -rf minimized
 
-fuzz: build 
-	afl-cmin -i ./seeds -o minimized -- ./png_fuzz @@
-	afl-fuzz -i minimized -o findings -x /AFLplusplus/dictionaries/png.dict -- ./png_fuzz @@
+fuzz: 
+	docker run -ti --rm --name $(CONTAINER) \
+		-v $$(pwd):/work \
+		-w /work \
+		$(IMAGE_NAME) bash -c " \
+		make build-instrumented-libpng && \
+		make build-harness && \
+		rm -rf ./minimized && \
+		afl-cmin -i ./seeds -o minimized -- ./png_fuzz @@ && \
+		afl-fuzz -i minimized -o findings -x /AFLplusplus/dictionaries/png.dict -- ./png_fuzz @@ \
+		"
 
 # No sanitizer build
 build-libpng-nosan:
@@ -57,10 +73,20 @@ build-harness-nosan:
 	-g -O1 \
 	-o png_fuzz_nosan
 
-fuzz-nosan: build-libpng-nosan build-harness-nosan
-	afl-fuzz -i /home/softsec/seeds -o findings-nosan \
-	-x /AFLplusplus/dictionaries/png.dict \
-	-- ./png_fuzz_nosan @@
+fuzz-nosan: 
+	docker run -ti --rm --name $(CONTAINER) \
+		-v $$(pwd):/work \
+		-w /work \
+		$(IMAGE_NAME) bash -c " \
+		make build-libpng-nosan && \
+		make build-harness-nosan && \
+		rm -rf ./minimized && \
+		afl-cmin -i ./seeds -o minimized -- ./png_fuzz_nosan @@ && \
+		afl-fuzz -i ./minimized -o ./findings-nosan \
+		-x /AFLplusplus/dictionaries/png.dict \
+		-- ./png_fuzz_nosan @@ \
+		"
+	
 
 # Persistent mode build
 build-harness-persistent:
@@ -71,10 +97,17 @@ build-harness-persistent:
 	-fsanitize=address -g -O1 \
 	-o png_fuzz_persistent
 
-fuzz-persistent: build-instrumented-libpng build-harness-persistent
-	afl-fuzz -i /home/softsec/seeds -o findings-persistent \
-	-x /AFLplusplus/dictionaries/png.dict \
-	-- ./png_fuzz_persistent @@
+fuzz-persistent: 
+	docker run -ti --rm --name $(CONTAINER) \
+		-v $$(pwd):/work \
+		-w /work \
+		$(IMAGE_NAME) bash -c " \
+		make build-instrumented-libpng && \
+		make build-harness-persistent && \
+		afl-fuzz -i ./seeds -o ./findings-persistent \
+		-x /AFLplusplus/dictionaries/png.dict \
+		-- ./png_fuzz_persistent @@ \
+		"
 
 # QEMU mode
 build-vanilla-libpng:
@@ -94,10 +127,17 @@ build-harness-qemu:
 	-g -O1 \
 	-o png_fuzz_qemu
 
-fuzz-qemu: build-vanilla-libpng build-harness-qemu
-	afl-cmin -Q -i ./seeds -o minimized -- ./png_fuzz_qemu @@
-	afl-fuzz -Q \
-	-i minimized \
-	-o findings-qemu \
-	-x /AFLplusplus/dictionaries/png.dict \
-	-- ./png_fuzz_qemu @@
+fuzz-qemu:
+	docker run -ti --rm --name $(CONTAINER) \
+		-v $$(pwd):/work \
+		-w /work \
+		$(IMAGE_NAME) bash -c " \
+		make build-vanilla-libpng && \
+		make build-harness-qemu && \
+		rm -rf ./minimized && \
+		afl-cmin -Q -i ./seeds -o minimized -- ./png_fuzz_qemu @@ && \
+		afl-fuzz -Q -i ./minimized -o ./findings-qemu \
+		-x /AFLplusplus/dictionaries/png.dict \
+		-- ./png_fuzz_qemu @@ \
+		"
+	
